@@ -1,68 +1,90 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
+import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Supply.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
+import "@openzeppelin/contracts/utils/Counters.sol";
 
-contract CATnft is ERC721,Ownable {
+interface IRandom {
+    function requestRandomWords() external returns (uint256);
+
+    function getRequestStatus() external view returns (uint256);
+    
+}
+
+contract WarframeTK is ERC1155, Ownable, ERC1155Supply {
     using Counters for Counters.Counter;
-    Counters.Counter private _tokenIds;
-    Counters.Counter private _addressId;
 
-    uint private whitelistPrice = 0.005 ether;
+    Counters.Counter private _count;
+
+    uint256 private constant swordBlueprint = 1;
+    uint256 private constant axeBlueprint = 2;
+    uint256 private constant swordExcalibur = 3;
+    uint256 private constant axeStormbreaker = 4;
+
+    uint private whitelistPrice = 0.05 ether;
+
+    uint public winnerIndex;
+
+    uint[] private id = [swordBlueprint,axeBlueprint,swordExcalibur,axeStormbreaker];
+    uint[] private supplies = [20,20,1,1];
+
+    mapping(uint => address) public whitelist;
+
+    constructor() ERC1155("https://ipfs.io/ipfs/bafybeihw3enczry66duwwo7ghgfvn2fa5cvmsu2jiijzuc4dus76ujteau/") {  }
 
 
-    mapping(address => bool) whitelist;
-
-    event Claimed(address _claimer,uint tokenId);
-
-    constructor() ERC721("CatsNFT", "CAT") {}
-
-    function _baseURI() internal pure override returns (string memory) {
-        return "https://ipfs.io/ipfs/bafybeicwfsjdswjvij56ivr3juktwt4v5vxgeajvgnhrozx65ed3beyo64/";
-    }
-
-
-    function setWhiteList() public payable{
-        require(!whitelist[msg.sender], "Already Whitelisted");
+    function setWhiteList(address participants) public payable{
         require(msg.value == whitelistPrice,"Not enough money!");
-        _addressId.increment();
-        uint256 newaddresId = _addressId.current();
-        require(newaddresId <= 5,"Maximum whitelisted user");
-        whitelist[msg.sender] = true;
-
+        _count.increment();
+        uint count = _count.current();
+        whitelist[count] = participants;
     }
 
-    function _burn(uint256 tokenId)
-        internal
-        override(ERC721)
-    {
-        super._burn(tokenId);
+    function generateRandomNum()public onlyOwner {
+        IRandom(0xD730CFd9ab76322DC0CC3615d9A8e7Af779fA700).requestRandomWords();
     }
 
-    function claimNFT() public {
-        require(whitelist[msg.sender], "Recipient must be whitelisted");
-        _tokenIds.increment();
-        uint256 newItemId = _tokenIds.current();
-        require(newItemId <= 5,"Can't mint more token");
-        _mint(msg.sender, newItemId);
-        whitelist[msg.sender] = false;
-        emit Claimed(msg.sender,newItemId);
+    function getWinnerIndex()public onlyOwner{
+        winnerIndex = IRandom(0xD730CFd9ab76322DC0CC3615d9A8e7Af779fA700).getRequestStatus();
+    }
+
+
+    function uri(uint256 _id) public view virtual override returns (string memory){
+        require(exists(_id),"URI: nonexistent token");
+        return string(abi.encodePacked(super.uri(_id), Strings.toString(_id), ".json"));
+    }
+
+    function airdropTokens() public onlyOwner{
+        _mintBatch(whitelist[winnerIndex], id, supplies, "");
+        whitelist[winnerIndex]=address(0);
     }
 
     function withdrawMoney() public onlyOwner{
         payable(msg.sender).transfer(address(this).balance);
     }
 
-
-    function tokenURI(uint256 tokenId)
-        public
-        view
-        override(ERC721)
-        returns (string memory)
+    function _beforeTokenTransfer(address operator, address from, address to, uint256[] memory ids, uint256[] memory amounts, bytes memory data)
+        internal
+        override(ERC1155, ERC1155Supply)
     {
-        return string(abi.encodePacked(super.tokenURI(tokenId), ".json"));
+        super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
     }
 
+    
 }
+
+//  0x6bBD0c46383Ef8439a487A58b99224d9305b3108
+
+
+
+
+
+
+
+
+
+
+

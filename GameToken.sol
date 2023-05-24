@@ -2,36 +2,53 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@chainlink/contracts/src/v0.8/ConfirmedOwner.sol";
 
-contract GameToken is ERC20 {
+interface IRandom {
+    function requestRandomWords() external returns (uint256);
 
-    address private owner;
+    function getRequestStatus() external view returns (uint256);
+    
+}
 
-    mapping(address => bool) public whitelist;
+contract GameToken is  ERC20,ConfirmedOwner  {
+
+    uint private count;
+
+    uint public winnerIndex;
+
+    mapping(uint256 => address) public whitelist;
+
+   
     
     
-    constructor() ERC20("Birtamod","BT"){
-        owner = msg.sender;
-        _mint(owner,10000 * 10 ** 18);
+    constructor() ERC20("BLockTone","BT") ConfirmedOwner(msg.sender){
+        count = 0;
+        _mint(msg.sender,10000 * 10 ** 18); // decical -- 18
+        // 1 * 10 ** 18;
+    }
+
+    function generateRandomNum()public onlyOwner {
+        IRandom(0xD730CFd9ab76322DC0CC3615d9A8e7Af779fA700).requestRandomWords();
     }
 
 
-    function setWhiteList() public {
-        require(!whitelist[msg.sender],"Already Whitelisted");
-        whitelist[msg.sender] = true;
+    function setWhiteList(address participants) public {
+        count++;
+        whitelist[count] = participants;
+    
     }
 
-    function claimToken() public {
-        require(whitelist[msg.sender],"You are not whitelisted or already claimed the token");
-        _mint(msg.sender,100 * 10 ** 18);
-        whitelist[msg.sender] = false;
+    function getWinnerIndex()public onlyOwner{
+        winnerIndex = IRandom(0xD730CFd9ab76322DC0CC3615d9A8e7Af779fA700).getRequestStatus();
     }
 
-    function airdropToken(address _recipient) public {
-        require(msg.sender == owner,"Caller must be owner");
-        require(whitelist[_recipient],"This person isn't whitelisted");
-        transfer(_recipient,100 * 10 ** 18);
-        whitelist[_recipient] = false;
+    
+    function airdropToken() public onlyOwner returns(address){
+        transfer(whitelist[winnerIndex],100 * 10 ** 18);
+        return whitelist[winnerIndex];
     }
 
 }
+
+//----- 0xD5d3FcD84cacd0f9bc26e6F7D2a9B0619dB87F93
